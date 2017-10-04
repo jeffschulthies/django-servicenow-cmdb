@@ -1,2 +1,2 @@
-# netbox-servicenow
-ServiceNow Integration for NetBox
+# ServiceNow CMDB
+ServiceNow Integration for Data Models
