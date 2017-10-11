@@ -1,3 +1,8 @@
+.idea/
+config/
+db.sqlite3
+manage.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
