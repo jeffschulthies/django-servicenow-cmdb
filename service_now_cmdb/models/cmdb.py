@@ -1,5 +1,4 @@
 import json
-from collections import defaultdict
 
 import requests
 from django.db import models
@@ -27,6 +26,7 @@ class CMDBObject(models.Model):
     The object you want to model 1:1 to your ServiceNow CMDB object.
     """
     type = models.ForeignKey('CMDBObjectType', on_delete=models.CASCADE, blank=False)
+    service_now_id = models.CharField(max_length=255)
 
     def post(self, access_token):
         """
@@ -53,7 +53,74 @@ class CMDBObject(models.Model):
         if r.status_code != 201:
             # Invalid Input
             return False
+
+        resp = json.loads(r.text)
+        self.service_now_id = resp['result']['sys_id']
         return True
+
+    def put(self, access_token):
+        """
+
+        :param access_token:
+        :return:
+        """
+
+        if not self.service_now_id:
+            raise ValueError("There is no ServiceNow ID associated with this object. Try creating the object first.")
+
+        service_now_headers = {
+            'Authorization': 'Bearer {}'.format(access_token),
+            'Content-Type': "application/json"
+        }
+
+        try:
+            r = requests.put(
+                url=self.type.endpoint + "/" + str(self.service_now_id),
+                headers=service_now_headers,
+                data=json.dumps(self.key_value)
+            )
+        except (ConnectionError, Timeout, HTTPError, TooManyRedirects) as e:
+            raise ValueError("Invalid Endpoint. Error: {}".format(e))
+
+        if r.status_code == 401:
+            raise ValueError("Bad Access Token")
+        if r.status_code != 200:
+            return False
+
+        resp = json.loads(r.text)
+        self.service_now_id = resp['result']['sys_id']
+
+        return True
+
+    def get(self, access_token):
+        """
+
+        :param access_token:
+        :return:
+        """
+
+        if not self.service_now_id:
+            raise ValueError("There is no ServiceNow ID associated with this object. Try creating the object first.")
+
+        service_now_headers = {
+            'Authorization': 'Bearer {}'.format(access_token),
+            'Content-Type': "application/json"
+        }
+
+        try:
+            r = requests.get(
+                url=self.type.endpoint + "/" + str(self.service_now_id),
+                headers=service_now_headers
+            )
+        except (ConnectionError, Timeout, HTTPError, TooManyRedirects) as e:
+            raise ValueError("Invalid Endpoint. Error: {}".format(e))
+
+        if r.status_code == 401:
+            raise ValueError("Bad Access Token")
+        if r.status_code != 200:
+            return False
+
+        return r.text
 
     @property
     def fields(self):
@@ -79,6 +146,18 @@ class CMDBObject(models.Model):
             d[field_name] = i['value']
         return d
 
+    def get_field(self, name):
+        """
+
+        :param name:
+        :return:
+        """
+        values = CMDBObjectValue.objects.filter(object=self)
+        for i in values:
+            if i.field.name == name:
+                return i
+        return None
+
 
 class CMDBObjectValue(models.Model):
     """
@@ -87,3 +166,7 @@ class CMDBObjectValue(models.Model):
     object = models.ForeignKey('CMDBObject', on_delete=models.CASCADE, blank=False)
     field = models.ForeignKey('CMDBObjectField', on_delete=models.CASCADE, blank=False)
     value = models.CharField(max_length=255, unique=False)
+
+    @property
+    def object_field(self):
+        return CMDBObjectField.objects.get(id=self.field)
