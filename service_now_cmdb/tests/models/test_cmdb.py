@@ -10,9 +10,13 @@ LOGGER = logging.getLogger(__name__)
 
 class TestCMDBObject(BaseModelTest):
     def test_object_relation(self):
-        values = CMDBObjectValue.objects.filter(object=self.test_ip).values_list('value', flat=True)
-        self.assertIn("55.55.55.122", values)
-        self.assertIn("/32", values)
+        pass
+
+    def test_object_post(self):
+        pass
+
+    def test_object_put(self):
+        pass
 
 
 class TestCMDBObjectType(TestCase):
