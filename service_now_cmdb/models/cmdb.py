@@ -28,6 +28,30 @@ class CMDBObject(models.Model):
     type = models.ForeignKey('CMDBObjectType', on_delete=models.CASCADE, blank=False)
     service_now_id = models.CharField(max_length=255)
 
+    @property
+    def fields(self):
+        """
+
+        :return: QuerySet
+        """
+        values = CMDBObjectValue.objects.filter(object=self).values_list('field_id')
+        field_names = CMDBObjectField.objects.filter(pk__in=values).values_list('name', flat=True)
+        return field_names
+
+    @property
+    def key_value(self):
+        """
+
+        :return: Dictionary
+        """
+        values = CMDBObjectValue.objects.filter(object=self).values()
+        d = dict()
+        for i in values:
+            object_field = CMDBObjectField.objects.get(id=i['field_id'])
+            field_name = object_field.name
+            d[field_name] = i['value']
+        return d
+
     def post(self, access_token):
         """
 
@@ -122,30 +146,6 @@ class CMDBObject(models.Model):
 
         return r.text
 
-    @property
-    def fields(self):
-        """
-
-        :return: QuerySet
-        """
-        values = CMDBObjectValue.objects.filter(object=self).values_list('field_id')
-        field_names = CMDBObjectField.objects.filter(pk__in=values).values_list('name', flat=True)
-        return field_names
-
-    @property
-    def key_value(self):
-        """
-
-        :return: Dictionary
-        """
-        values = CMDBObjectValue.objects.filter(object=self).values()
-        d = dict()
-        for i in values:
-            object_field = CMDBObjectField.objects.get(id=i['field_id'])
-            field_name = object_field.name
-            d[field_name] = i['value']
-        return d
-
     def get_field(self, name):
         """
 
@@ -157,6 +157,16 @@ class CMDBObject(models.Model):
             if i.field.name == name:
                 return i
         return None
+
+    def set_field(self, name, value):
+        """
+
+        :param name: field name
+        :param value:
+        :return:
+        """
+        object_value = CMDBObjectValue.objects.create(object=self, field=name, value=value)
+        object_value.save()
 
 
 class CMDBObjectValue(models.Model):

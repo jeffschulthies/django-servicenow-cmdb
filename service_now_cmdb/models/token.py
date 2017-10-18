@@ -11,6 +11,7 @@ from django.db import models
 from django.utils import timezone
 
 from django.conf import settings
+from requests import Timeout, HTTPError, TooManyRedirects
 
 
 class ServiceNowToken(models.Model):
@@ -28,22 +29,36 @@ class ServiceNowToken(models.Model):
         default_permissions = []
 
     def __str__(self):
-        # Only display the last 24 bits of the token to avoid accidental exposure.
+        # Only display the last 6 bits of the token to avoid accidental exposure.
         return "{}".format(self.access_token[-6:])
-
-    def save(self, *args, **kwargs):
-        return super(ServiceNowToken, self).save(*args, **kwargs)
 
     @property
     def is_expired(self):
-        if self.expires is None or timezone.now() < self.expires:
+        if self.expires == "" or self.expires is None or timezone.now() > self.expires:
             return False
+        return True
+
+    def _update_token(self, data):
+        """
+        Used by the get new token method
+
+        :param data:
+        :return:
+        """
+
+        self.scope = data['scope']
+        expiration = timezone.now() + timezone.timedelta(seconds=int((data['expires_in'])))
+        self.expires = expiration
+        self.access_token = str(data['access_token'])
+        self.refresh_token = str(data['refresh_token'])
+        self.save()
         return True
 
     def get_new_token(self):
         """
 
-        :return:
+        :return: False if the endpoint
+        :raises ValueError: This can be caused by multiple errors.
         """
         url = "https://{}.service-now.com/oauth_token.do".format(settings.SERVICE_NOW_DOMAIN)
 
@@ -60,20 +75,19 @@ class ServiceNowToken(models.Model):
         payload = urllib.parse.urlencode(data, quote_via=quote_plus)
         payload = payload + "&client_secret={}".format(settings.SERVICE_NOW_CLIENT_SECRET)
 
-        r = requests.post(url=url, headers=headers, data=payload)
+        try:
+            r = requests.post(url=url, headers=headers, data=payload)
+        except (ConnectionError, Timeout, HTTPError, TooManyRedirects) as e:
+            raise ValueError("Invalid ServiceNow Endpoint. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
+                             "or SERVICE_NOW_CLIENT_SECRET in the settings file.".format(e))
 
         if r.status_code != 200:
-            return False
+            raise ValueError("Something went wrong. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
+                             "or SERVICE_NOW_CLIENT_SECRET in the settings file. ")
 
         data = json.loads(r.text)
 
-        token = ServiceNowToken.objects.get(id=self.id)
-        token.scope = data['scope']
-        expiration = timezone.now() + timezone.timedelta(seconds=int((data['expires_in'])))
-        token.expires = expiration
-        token.access_token = str(data['access_token'])
-        token.refresh_token = str(data['refresh_token'])
-        token.save()
+        self._update_token(data)
         return True
 
     @staticmethod
