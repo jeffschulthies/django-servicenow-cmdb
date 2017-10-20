@@ -1,0 +1,7 @@
+[report]
+show_missing = True
+omit =
+        *__init__*
+        */usr/local/lib*
+        *Test*
+        *service_now_cmdb/migrations/*
