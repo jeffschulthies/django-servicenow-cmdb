@@ -1,31 +1,9 @@
-from service_now_cmdb.models.cmdb import CMDBObjectType, CMDBObjectField, CMDBObject, CMDBObjectValue
 from service_now_cmdb.tests.base_test import BaseTest
 
 
 class BaseModelTest(BaseTest):
-    def setUp(self):
-        BaseTest.setUp(self)
+    error_response = '{"error_description":"access_denied","error":"server_error"}'
+    successful_response = '{"access_token":"sl6HfrB9Td5m4hy8MOwmzNV_NP4muV0zXLi-b3hQSxqHZuOnnXn53U8hiZpWk4_gP9rSzWzxm_uVnYnKEtNLJQ","refresh_token":"Qh2LwLUc-HXskeh58aQNCG_56yI3lPj_X8w9BU0rbwSNVmhiqfmG8hW8jBFap-6G5A_uDL8dJkIryrutniSzdw","scope":"useraccount","token_type":"Bearer","expires_in":1799}'
+    access_token = "sl6HfrB9Td5m4hy8MOwmzNV_NP4muV0zXLi-b3hQSxqHZuOnnXn53U8hiZpWk4_gP9rSzWzxm_uVnYnKEtNLJQ"  # These tokens will be used to test the updating method
+    refresh_token = "Qh2LwLUc-HXskeh58aQNCG_56yI3lPj_X8w9BU0rbwSNVmhiqfmG8hW8jBFap-6G5A_uDL8dJkIryrutniSzdw"
 
-        # ip_address = CMDBObjectType.objects.create(
-        #     name="IPAddress",
-        #     endpoint="https://athenahealthtest.service-now.com/api/now/table/cmdb_ci_ip_network"
-        # )
-        #
-        # subnet = CMDBObjectField.objects.create(
-        #     type=ip_address,
-        #     name="subnet"
-        # )
-        #
-        # u_mask = CMDBObjectField.objects.create(type=ip_address, name="u_mask")
-        # CMDBObjectField.objects.create(type=ip_address, name="ip_address")
-        # CMDBObjectField.objects.create(type=ip_address, name="router")
-        # CMDBObjectField.objects.create(type=ip_address, name="u_site_ref")
-        # CMDBObjectField.objects.create(type=ip_address, name="u_security_zone")
-        # CMDBObjectField.objects.create(type=ip_address, name="name")
-        # CMDBObjectField.objects.create(type=ip_address, name="u_number")
-        #
-        # test_ip = CMDBObject.objects.create(type=ip_address)
-        # CMDBObjectValue.objects.create(object=test_ip, field=subnet, value="55.55.55.122")
-        # CMDBObjectValue.objects.create(object=test_ip, field=u_mask, value="/32")
-        #
-        # self.test_ip = test_ip

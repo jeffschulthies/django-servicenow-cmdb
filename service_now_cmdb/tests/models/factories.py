@@ -2,11 +2,13 @@ from datetime import datetime
 
 import factory
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.utils.timezone import now
 from factory import SubFactory
 from factory.fuzzy import FuzzyDateTime
 from pytz import UTC
 
+from service_now_cmdb.models import CMDBObject, CMDBObjectField, CMDBObjectValue, CMDBObjectType
 from service_now_cmdb.models.token import ServiceNowToken
 
 
@@ -23,6 +25,9 @@ class UserFactory(factory.django.DjangoModelFactory):
     last_login = factory.LazyFunction(now)
 
 
+#
+#  Token Factory
+#
 class ServiceNowTokenFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = ServiceNowToken
@@ -42,3 +47,49 @@ class ExpiredServiceNowTokenFactory(ServiceNowTokenFactory):
 class NotExpiredServiceNowTokenFactory(ServiceNowTokenFactory):
     expires = FuzzyDateTime(datetime(9999, 10, 1, tzinfo=UTC), datetime(9999, 10, 1, tzinfo=UTC))
 
+
+#
+#  CMDB Models
+#
+class CMDBObjectTypeFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = CMDBObjectType
+
+    # name = factory.Iterator(["IPAddress", "CIDR"])
+    # endpoint = factory.Iterator(['https://companyname.service-now.com/api/now/table/cmdb_ci_ip_network', 'https://companyname.service-now.com/api/now/table/CIDR'])
+    name = "IPAddress"
+    endpoint = "https://companyname.service-now.com/api/now/table/cmdb_ci_ip_network"
+
+
+class CMDBObjectFieldFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = CMDBObjectField
+
+    type = None
+    name = "subnet"
+
+
+class CMDBObjectFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = CMDBObject
+
+    type = None
+
+
+class CMDBCompleteType(CMDBObjectTypeFactory):
+    @factory.post_generation
+    def generate_related_fields(self, create, extracted, **kwargs):
+        if not create:
+            return
+        t_field = CMDBObjectFieldFactory(type=self)
+        t_object = CMDBObjectFactory(type=self)
+        t_value = CMDBObjectValueFactory(object=t_object, field=t_field)
+        return self, t_field, t_object, t_value
+
+
+class CMDBObjectValueFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = CMDBObjectValue
+    object = None
+    field = None
+    value = "55.55.55.122"
