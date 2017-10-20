@@ -2,7 +2,6 @@ from datetime import datetime
 
 import factory
 from django.contrib.auth import get_user_model
-from django.db import models
 from django.utils.timezone import now
 from factory import SubFactory
 from factory.fuzzy import FuzzyDateTime
