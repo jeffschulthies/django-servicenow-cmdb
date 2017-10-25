@@ -4,6 +4,8 @@ import requests
 from django.db import models
 from requests import TooManyRedirects, HTTPError, ConnectionError, Timeout
 
+from config import settings
+
 
 class CMDBObjectType(models.Model):
     """
@@ -12,6 +14,9 @@ class CMDBObjectType(models.Model):
     name = models.CharField(max_length=255, unique=False, blank=False)
     endpoint = models.CharField(max_length=255, unique=False, blank=False)
 
+    def __str__(self):
+        return "{}:{}".format(self.id, self.name)
+
 
 class CMDBObjectField(models.Model):
     """
@@ -19,6 +24,10 @@ class CMDBObjectField(models.Model):
     """
     name = models.CharField(max_length=255, unique=False, blank=False)
     type = models.ForeignKey('CMDBObjectType', on_delete=models.CASCADE, blank=False)
+    order = models.PositiveIntegerField(blank=True)
+
+    def __str__(self):
+        return "{}:{}:{}".format(self.id, self.name, self.type)
 
 
 class CMDBObject(models.Model):
@@ -27,6 +36,9 @@ class CMDBObject(models.Model):
     """
     type = models.ForeignKey('CMDBObjectType', on_delete=models.CASCADE, blank=False)
     service_now_id = models.CharField(max_length=255)
+
+    def __str__(self):
+        return "{}:{}:{}".format(self.id, self.type.name, self.service_now_id)
 
     @property
     def fields(self):
@@ -65,7 +77,7 @@ class CMDBObject(models.Model):
 
         try:
             r = requests.post(
-                url=self.type.endpoint,
+                url="https://{}.service-now.com/api/now/table/{}".format(settings.SERVICE_NOW_DOMAIN, self.type.endpoint),
                 headers=service_now_headers,
                 data=json.dumps(self.key_value)
             )
@@ -99,7 +111,7 @@ class CMDBObject(models.Model):
 
         try:
             r = requests.put(
-                url=self.type.endpoint + "/" + str(self.service_now_id),
+                url="https://{}.service-now.com/api/now/table/{}/{}".format(settings.SERVICE_NOW_DOMAIN, self.type.endpoint, str(self.service_now_id)),
                 headers=service_now_headers,
                 data=json.dumps(self.key_value)
             )
@@ -133,7 +145,7 @@ class CMDBObject(models.Model):
 
         try:
             r = requests.get(
-                url=self.type.endpoint + "/" + str(self.service_now_id),
+                url="https://{}.service-now.com/api/now/table/{}/{}".format(settings.SERVICE_NOW_DOMAIN, self.type.endpoint, str(self.service_now_id)),
                 headers=service_now_headers
             )
         except (ConnectionError, Timeout, HTTPError, TooManyRedirects) as e:
@@ -176,6 +188,13 @@ class CMDBObjectValue(models.Model):
     object = models.ForeignKey('CMDBObject', on_delete=models.CASCADE, blank=False)
     field = models.ForeignKey('CMDBObjectField', on_delete=models.CASCADE, blank=False)
     value = models.CharField(max_length=255, unique=False)
+
+    def __str__(self):
+        return "{}:{}:{}".format(self.object.id, self.field, self.value)
+
+    def save(self, *args, **kwargs):
+        # TODO Add validation. 2 of the same fields should not be able to have the same object.
+        super(CMDBObjectValue, self).save(*args, **kwargs)
 
     @property
     def object_field(self):
