@@ -83,15 +83,13 @@ class TestServiceNowToken(BaseModelTest):
     def test_successful_get_credentials(self, post):
         type(post.return_value).status_code = PropertyMock(return_value=200)
         type(post.return_value).text = PropertyMock(return_value=self.successful_response)
-        text, value = ServiceNowToken.get_credentials("jeff", "test")
+        text = ServiceNowToken.get_credentials("jeff", "test")
         self.assertEqual(text, json.loads(self.successful_response))
-        self.assertEqual(value, True)
 
     @override_settings(SERVICE_NOW_DOMAIN="Test", SERVICE_NOW_CLIENT_ID="Test", SERVICE_NOW_CLIENT_SECRET="test")
     @patch('requests.post')
     def test_error_get_credentials(self, post):
         type(post.return_value).status_code = PropertyMock(return_value=401)
         type(post.return_value).text = PropertyMock(return_value=self.error_response)
-        text, value = ServiceNowToken.get_credentials("jeff", "test")
+        text = ServiceNowToken.get_credentials("jeff", "test")
         self.assertEqual(text, json.loads(self.error_response))
-        self.assertEqual(value, False)

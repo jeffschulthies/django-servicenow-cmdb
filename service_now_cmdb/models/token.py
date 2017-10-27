@@ -1,18 +1,13 @@
 import json
 import urllib
-from urllib.parse import quote_plus
-
 import requests
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
-
-
-# @python_2_unicode_compatible
 from django.utils import timezone
-
 from django.conf import settings
 from requests import Timeout, HTTPError, TooManyRedirects
+from urllib.parse import quote_plus
 
 
 class ServiceNowToken(models.Model):
@@ -100,7 +95,7 @@ class ServiceNowToken(models.Model):
         :param user:
         :return:
         """
-        data = data[0]
+        data
         expiration = timezone.now() + (timezone.timedelta(seconds=int(data['expires_in'])))
         try:
             sn_token = ServiceNowToken.objects.get(user=user)
@@ -148,7 +143,10 @@ class ServiceNowToken(models.Model):
         except (ConnectionError, Timeout, HTTPError, TooManyRedirects) as e:
             raise ValueError("Invalid ServiceNow Endpoint. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
                              "or SERVICE_NOW_CLIENT_SECRET in the settings file.".format(e))
-        if r.status_code != 200:
-            raise ValueError("Something went wrong. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
-                             "or SERVICE_NOW_CLIENT_SECRET in the settings file. ")
-        return json.loads(r.text), True
+        try:
+            r.raise_for_status()
+        except:
+            raise ValueError("Invalid ServiceNow Endpoint. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
+                             "or SERVICE_NOW_CLIENT_SECRET in the settings file.")
+
+        return json.loads(r.text)
