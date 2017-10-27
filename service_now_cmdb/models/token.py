@@ -4,6 +4,7 @@ from urllib.parse import quote_plus
 
 import requests
 from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 
 
@@ -91,6 +92,34 @@ class ServiceNowToken(models.Model):
         return True
 
     @staticmethod
+    def create_token(data, user):
+        """
+        Create a token from a json object created from the ServiceNow response.
+
+        :param data:
+        :param user:
+        :return:
+        """
+        data = data[0]
+        expiration = timezone.now() + (timezone.timedelta(seconds=int(data['expires_in'])))
+        try:
+            sn_token = ServiceNowToken.objects.get(user=user)
+            sn_token.scope = data['scope']
+            sn_token.access_token = data['access_token']
+            sn_token.refresh_token = data['refresh_token']
+            sn_token.expires = expiration
+            sn_token.save()
+        except ObjectDoesNotExist:
+            sn_token = ServiceNowToken(user=user,
+                                       scope=data['scope'],
+                                       access_token=data['access_token'],
+                                       refresh_token=data['refresh_token'],
+                                       expires=expiration
+                                       )
+            sn_token.save()
+        return sn_token
+
+    @staticmethod
     def get_credentials(username, password):
         """
 
@@ -114,6 +143,8 @@ class ServiceNowToken(models.Model):
         payload = urllib.parse.urlencode(data, quote_via=quote_plus)
         payload = payload + "&client_secret={}".format(settings.SERVICE_NOW_CLIENT_SECRET)
 
+        # TODO Exceptions
+        # E.g. requests.exceptions.ConnectionError
         r = requests.post(url=url, headers=headers, data=payload)
 
         if r.status_code != 200:

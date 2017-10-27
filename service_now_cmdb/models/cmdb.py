@@ -1,6 +1,9 @@
 import json
 
 import requests
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models
 from requests import TooManyRedirects, HTTPError, ConnectionError, Timeout
 
@@ -13,6 +16,7 @@ class CMDBObjectType(models.Model):
     """
     name = models.CharField(max_length=255, unique=False, blank=False)
     endpoint = models.CharField(max_length=255, unique=False, blank=False)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
 
     def __str__(self):
         return "{}:{}".format(self.id, self.name)
@@ -29,6 +33,14 @@ class CMDBObjectField(models.Model):
     def __str__(self):
         return "{}:{}:{}".format(self.id, self.name, self.type)
 
+    def clean(self):
+        if CMDBObjectField.objects.filter(name=self.name, type=self.type).exists():
+            raise ValidationError("There already exists a field '{}' associated with this object type '{}'.".format(self.name, self.type.name))
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super(CMDBObjectField, self).save(*args, **kwargs)
+
 
 class CMDBObject(models.Model):
     """
@@ -36,9 +48,13 @@ class CMDBObject(models.Model):
     """
     type = models.ForeignKey('CMDBObjectType', on_delete=models.CASCADE, blank=False)
     service_now_id = models.CharField(max_length=255)
+    object_id = models.PositiveIntegerField()
 
     def __str__(self):
         return "{}:{}:{}".format(self.id, self.type.name, self.service_now_id)
+
+    def save(self, *args, **kwargs):
+        super(CMDBObject, self).save(*args, **kwargs)
 
     @property
     def fields(self):
@@ -193,7 +209,6 @@ class CMDBObjectValue(models.Model):
         return "{}:{}:{}".format(self.object.id, self.field, self.value)
 
     def save(self, *args, **kwargs):
-        # TODO Add validation. 2 of the same fields should not be able to have the same object.
         super(CMDBObjectValue, self).save(*args, **kwargs)
 
     @property

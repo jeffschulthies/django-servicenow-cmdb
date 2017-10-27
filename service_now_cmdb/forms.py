@@ -6,7 +6,7 @@ from service_now_cmdb.models import CMDBObjectValue, CMDBObject, CMDBObjectField
 class CMDBObjectTypeForm(forms.ModelForm):
     class Meta:
         model = CMDBObjectType
-        fields = ['name', 'endpoint']
+        fields = ['name', 'endpoint', 'content_type']
 
 
 class CMDBObjectFieldForm(forms.ModelForm):

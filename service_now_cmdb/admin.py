@@ -7,7 +7,7 @@ from service_now_cmdb.models import CMDBObjectType, CMDBObjectField, CMDBObject,
 @admin.register(CMDBObjectType)
 class CMDBObjectTypeAdmin(admin.ModelAdmin):
     form = CMDBObjectTypeForm
-    list_display = ['name', 'endpoint']
+    list_display = ['name', 'endpoint', 'content_type']
 
 
 @admin.register(CMDBObjectField)
