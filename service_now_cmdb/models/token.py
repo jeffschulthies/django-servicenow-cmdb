@@ -143,10 +143,12 @@ class ServiceNowToken(models.Model):
         payload = urllib.parse.urlencode(data, quote_via=quote_plus)
         payload = payload + "&client_secret={}".format(settings.SERVICE_NOW_CLIENT_SECRET)
 
-        # TODO Exceptions
-        # E.g. requests.exceptions.ConnectionError
-        r = requests.post(url=url, headers=headers, data=payload)
-
+        try:
+            r = requests.post(url=url, headers=headers, data=payload)
+        except (ConnectionError, Timeout, HTTPError, TooManyRedirects) as e:
+            raise ValueError("Invalid ServiceNow Endpoint. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
+                             "or SERVICE_NOW_CLIENT_SECRET in the settings file.".format(e))
         if r.status_code != 200:
-            return json.loads(r.text), False
+            raise ValueError("Something went wrong. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
+                             "or SERVICE_NOW_CLIENT_SECRET in the settings file. ")
         return json.loads(r.text), True
