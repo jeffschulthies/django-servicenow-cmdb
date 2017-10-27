@@ -1,5 +1,3 @@
-import getpass
-
 from django.contrib.contenttypes.models import ContentType
 
 from config import settings
@@ -7,22 +5,21 @@ from service_now_cmdb.models import CMDBObjectType, CMDBObject, CMDBObjectValue,
 
 
 class SNCMDBHandler:
-
-    def __init__(self, user, *args, **kwargs):
+    def __init__(self, user):
         self.user = user
         self.domain = settings.SERVICE_NOW_DOMAIN
         self.client_id = settings.SERVICE_NOW_CLIENT_ID
         self.client_secret = settings.SERVICE_NOW_CLIENT_SECRET
         self.token = None
 
-    def create_credentials(self, username):
+    def create_credentials(self, username, password):
         """
         If the user is not associated with sn credentials.
 
         :param username:
+        :param password:
         :return:
         """
-        password = getpass.getpass(prompt='Enter your password: ')
         data = ServiceNowToken.get_credentials(username, password)
         self.token = ServiceNowToken.create_token(data, self.user)
         return True
@@ -54,7 +51,7 @@ class SNCMDBHandler:
     @staticmethod
     def update_cmdb_object_type(model, endpoint):
         """
-
+        Update the model endpoint
         :param model:
         :param endpoint:
         :return:
@@ -132,6 +129,7 @@ class SNCMDBHandler:
             object=cmdb_object,
             field=cmdb_field
         )
+
         cmdb_object_value.value = value
         cmdb_object_value.save()
         return cmdb_object_value
@@ -186,10 +184,13 @@ class SNCMDBHandler:
         cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
         object_id = model_object.id
 
-        cmdb_object = CMDBObject.objects.get(
-            type=cmdb_object_type,
-            object_id=object_id
-        )
+        try:
+            cmdb_object = CMDBObject.objects.get(
+                type=cmdb_object_type,
+                object_id=object_id
+            )
+        except CMDBObject.DoesNotExist:
+            raise "You must create a cmdb_object first."
 
         cmdb_object.put(self, self.token)
 
