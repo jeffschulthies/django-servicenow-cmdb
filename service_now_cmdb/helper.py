@@ -1,7 +1,9 @@
 from django.contrib.contenttypes.models import ContentType
 
-from config import settings
-from service_now_cmdb.models import CMDBObjectType, CMDBObject, CMDBObjectValue, ServiceNowToken, CMDBObjectField
+from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+
+from .models import CMDBObjectType, CMDBObject, CMDBObjectValue, ServiceNowToken, CMDBObjectField
 
 
 class SNCMDBHandler:
@@ -29,7 +31,10 @@ class SNCMDBHandler:
 
         :return:
         """
-        self.token = ServiceNowToken.objects.get(user=self.user)
+        try:
+            self.token = ServiceNowToken.objects.get(user=self.user)
+        except ObjectDoesNotExist:
+            return False
         return True
 
     @staticmethod

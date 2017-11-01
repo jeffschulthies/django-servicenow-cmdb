@@ -1,7 +1,7 @@
 from django.contrib import admin
 
-from service_now_cmdb.forms import CMDBObjectForm, CMDBObjectTypeForm, CMDBObjectFieldForm, CMDBObjectValueForm
-from service_now_cmdb.models import CMDBObjectType, CMDBObjectField, CMDBObject, CMDBObjectValue
+from .forms import CMDBObjectForm, CMDBObjectTypeForm, CMDBObjectFieldForm, CMDBObjectValueForm
+from .models import CMDBObjectType, CMDBObjectField, CMDBObject, CMDBObjectValue
 
 
 @admin.register(CMDBObjectType)

@@ -1,6 +1,6 @@
 from django import forms
 
-from service_now_cmdb.models import CMDBObjectValue, CMDBObject, CMDBObjectField, CMDBObjectType
+from .models import CMDBObjectValue, CMDBObject, CMDBObjectField, CMDBObjectType
 
 
 class CMDBObjectTypeForm(forms.ModelForm):

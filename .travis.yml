@@ -1,0 +1,17 @@
+{
+  "sudo": false,
+  "language": "python",
+  "cache": "pip",
+  "git": {
+    "depth": 1
+  },
+  "python": "3.6",
+  "env": "DJANGO=\"Django>=1.8,<1.9\"",
+  "before_install": "pip install --upgrade pip",
+  "install": "pip install $DJANGO mock-django==0.6.9 django-js-asset",
+  "script": "cd tests/ && ./runtests.sh",
+  "group": "stable",
+  "dist": "trusty",
+  "os": "linux"
+}
+

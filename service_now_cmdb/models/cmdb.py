@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from requests import TooManyRedirects, HTTPError, ConnectionError, Timeout
 
-from config import settings
+from django.conf import settings
 
 
 class CMDBObjectType(models.Model):
