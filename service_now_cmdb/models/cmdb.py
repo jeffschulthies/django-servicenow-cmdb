@@ -27,6 +27,8 @@ class CMDBObjectField(models.Model):
     """
     name = models.CharField(max_length=255, unique=False, blank=False)
     type = models.ForeignKey('CMDBObjectType', on_delete=models.CASCADE, blank=False)
+    model_field = models.CharField(max_length=255, unique=False, blank=True)
+    model_function = models.CharField(max_length=255, unique=False, blank=True)
     order = models.PositiveIntegerField(blank=True)
 
     def __str__(self):
@@ -35,6 +37,12 @@ class CMDBObjectField(models.Model):
     def clean(self):
         if CMDBObjectField.objects.filter(name=self.name, type=self.type).exists():
             raise ValidationError("There already exists a field '{}' associated with this object type '{}'.".format(self.name, self.type.name))
+        if CMDBObjectField.objects.filter(name=self.model_field, type=self.type).exists():
+            raise ValidationError("There already exists a model field '{}' associated with this object type '{}'.".format(self.model_field, self.type.name))
+        if self.model_field and self.model_function:
+            raise ValidationError("Model field and model function can not both be defined")
+        if not self.model_field and not self.model_function:
+            raise ValidationError("Model field and model function can not both be empty")
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -59,7 +67,28 @@ class CMDBObject(models.Model):
     def fields(self):
         """
 
-        :return: QuerySet
+        Returns:
+
+        """
+        fields = CMDBObjectField.objects.filter(type=self.type)
+        return fields
+
+    @property
+    def field_names(self):
+        """
+
+        Returns:
+
+        """
+        field_names = CMDBObjectField.objects.filter(type=self.type).values_list('name', flat=True)
+        return field_names
+
+    @property
+    def non_empty_field_names(self):
+        """
+
+        Returns:
+
         """
         values = CMDBObjectValue.objects.filter(object=self).values_list('field_id')
         field_names = CMDBObjectField.objects.filter(pk__in=values).values_list('name', flat=True)
@@ -69,7 +98,8 @@ class CMDBObject(models.Model):
     def key_value(self):
         """
 
-        :return: Dictionary
+        Returns:
+
         """
         values = CMDBObjectValue.objects.filter(object=self).values()
         d = dict()
@@ -82,8 +112,11 @@ class CMDBObject(models.Model):
     def post(self, access_token):
         """
 
-        :param access_token:
-        :return:
+        Args:
+            access_token:
+
+        Returns:
+
         """
         service_now_headers = {
             'Authorization': 'Bearer {}'.format(access_token),
@@ -106,14 +139,19 @@ class CMDBObject(models.Model):
             return False
 
         resp = json.loads(r.text)
+
         self.service_now_id = resp['result']['sys_id']
+        self.save()
         return True
 
     def put(self, access_token):
         """
 
-        :param access_token:
-        :return:
+        Args:
+            access_token:
+
+        Returns:
+
         """
 
         if not self.service_now_id:
@@ -138,18 +176,17 @@ class CMDBObject(models.Model):
         if r.status_code != 200:
             return False
 
-        resp = json.loads(r.text)
-        self.service_now_id = resp['result']['sys_id']
-
         return True
 
     def get(self, access_token):
         """
 
-        :param access_token:
-        :return:
-        """
+        Args:
+            access_token:
 
+        Returns:
+
+        """
         if not self.service_now_id:
             raise ValueError("There is no ServiceNow ID associated with this object. Try creating the object first.")
 
@@ -176,8 +213,11 @@ class CMDBObject(models.Model):
     def get_field(self, name):
         """
 
-        :param name:
-        :return:
+        Args:
+            name:
+
+        Returns:
+
         """
         values = CMDBObjectValue.objects.filter(object=self)
         for i in values:
@@ -188,9 +228,12 @@ class CMDBObject(models.Model):
     def set_field(self, name, value):
         """
 
-        :param name: field name
-        :param value:
-        :return:
+        Args:
+            name:
+            value:
+
+        Returns:
+
         """
         object_value = CMDBObjectValue.objects.create(object=self, field=name, value=value)
         object_value.save()

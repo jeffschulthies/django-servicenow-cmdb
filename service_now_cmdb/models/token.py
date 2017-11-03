@@ -38,8 +38,11 @@ class ServiceNowToken(models.Model):
         """
         Used by the get new token method
 
-        :param data:
-        :return:
+        Args:
+            data:
+
+        Returns:
+
         """
 
         self.scope = data['scope']
@@ -53,9 +56,11 @@ class ServiceNowToken(models.Model):
     def get_new_token(self):
         """
 
-        :return: False if the endpoint
-        :raises ValueError: This can be caused by multiple errors.
+        Returns: False if the endpoint
+        Raises ValueError: This can be caused by multiple errors.
+
         """
+
         url = "https://{}.service-now.com/oauth_token.do".format(settings.SERVICE_NOW_DOMAIN)
 
         headers = {
@@ -91,11 +96,14 @@ class ServiceNowToken(models.Model):
         """
         Create a token from a json object created from the ServiceNow response.
 
-        :param data:
-        :param user:
-        :return:
+        Args:
+            data:
+            user:
+
+        Returns:
+
         """
-        data
+
         expiration = timezone.now() + (timezone.timedelta(seconds=int(data['expires_in'])))
         try:
             sn_token = ServiceNowToken.objects.get(user=user)
@@ -118,9 +126,12 @@ class ServiceNowToken(models.Model):
     def get_credentials(username, password):
         """
 
-        :param username:
-        :param password:
-        :return:
+        Args:
+            username:
+            password:
+
+        Returns:
+
         """
         url = "https://{}.service-now.com/oauth_token.do".format(settings.SERVICE_NOW_DOMAIN)
 

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
 from .models import CMDBObjectType, CMDBObject, CMDBObjectValue, ServiceNowToken, CMDBObjectField
+import service_now_cmdb.function_mapping as store
 
 
 class SNCMDBHandler:
@@ -18,9 +19,12 @@ class SNCMDBHandler:
         """
         If the user is not associated with sn credentials.
 
-        :param username:
-        :param password:
-        :return:
+        Args:
+            username:
+            password:
+
+        Returns:
+
         """
         data = ServiceNowToken.get_credentials(username, password)
         self.token = ServiceNowToken.create_token(data, self.user)
@@ -29,7 +33,8 @@ class SNCMDBHandler:
     def get_credentials(self):
         """
 
-        :return:
+        Returns:
+
         """
         try:
             self.token = ServiceNowToken.objects.get(user=self.user)
@@ -41,9 +46,12 @@ class SNCMDBHandler:
     def create_cmdb_object_type(model, endpoint):
         """
 
-        :param model:
-        :param endpoint:
-        :return:
+        Args:
+            model:
+            endpoint:
+
+        Returns:
+
         """
         model = ContentType.objects.get_for_model(model)
         cmdb_object_type = CMDBObjectType.objects.create(
@@ -57,9 +65,13 @@ class SNCMDBHandler:
     def update_cmdb_object_type(model, endpoint):
         """
         Update the model endpoint
-        :param model:
-        :param endpoint:
-        :return:
+
+        Args:
+            model:
+            endpoint:
+
+        Returns:
+
         """
         model = ContentType.objects.get_for_model(model)
         cmdb_object_type = CMDBObjectType.objects.get(
@@ -71,36 +83,59 @@ class SNCMDBHandler:
         return cmdb_object_type
 
     @staticmethod
-    def create_cmdb_object_field(name, cmdb_type, order):
+    def create_cmdb_object_field(name, cmdb_type, order, model_field="", model_function=""):
         """
 
-        :param name:
-        :param cmdb_type:
-        :param order:
-        :return:
+        Args:
+            name:
+            cmdb_type:
+            order:
+            model_field:
+            model_function:
+
+        Returns:
+
         """
+
+        if model_field and model_function:
+            raise ValueError("model_field and model_function are both defined. You may only set one of them.")
+        if not model_field and not model_function:
+            raise ValueError("Neither model_field nor model_function are defined. You may must set one of them.")
+
         cmdb_object_field = CMDBObjectField.objects.create(
             name=name,
             type=cmdb_type,
+            model_field=model_field,
+            model_function=model_function,
             order=order
         )
         return cmdb_object_field
 
     @staticmethod
-    def update_cmdb_object_field(name, cmdb_type, new_name=None, order=None):
+    def update_cmdb_object_field(name, cmdb_type, new_name=None, order=None, model_field=None, model_function=None):
         """
-        Note: The ServiceNow object will need to be updated.
-        :param name:
-        :param cmdb_type:
-        :param new_name:
-        :param order:
-        :return:
+
+        Args:
+            name:
+            cmdb_type:
+            new_name:
+            order:
+            model_field:
+            model_function:
+
+        Returns:
+
         """
         cmdb_object_field = CMDBObjectField.objects.get(name=name, type=cmdb_type)
         if new_name:
             cmdb_object_field.name = new_name
         if order:
             cmdb_object_field.order = order
+        if model_field:
+            cmdb_object_field.model_field = model_field
+        if model_function:
+            cmdb_object_field.model_function = model_function
+
         cmdb_object_field.save()
 
         return cmdb_object_field
@@ -109,10 +144,13 @@ class SNCMDBHandler:
     def create_cmdb_object_value(cmdb_object, cmdb_field, value):
         """
 
-        :param cmdb_object:
-        :param cmdb_field:
-        :param value:
-        :return:
+        Args:
+            cmdb_object:
+            cmdb_field:
+            value:
+
+        Returns:
+
         """
         cmdb_object_value = CMDBObjectValue.objects.create(
             object=cmdb_object,
@@ -125,10 +163,13 @@ class SNCMDBHandler:
     def update_cmdb_object_value(cmdb_object, cmdb_field, value):
         """
 
-        :param cmdb_object:
-        :param cmdb_field:
-        :param value:
-        :return:
+        Args:
+            cmdb_object:
+            cmdb_field:
+            value:
+
+        Returns:
+
         """
         cmdb_object_value = CMDBObjectValue.objects.get(
             object=cmdb_object,
@@ -142,31 +183,58 @@ class SNCMDBHandler:
     def create_cmdb_object(self, model_object):
         """
 
-        :param model_object:
-        :return:
+        Args:
+            model_object:
+
+        Returns:
+
         """
+
         model = ContentType.objects.get_for_model(model_object)
         cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
+
+        if self.does_cmdb_object_exist(model_object):
+            raise ValueError("This object already has a model. Try using the update_cmdb_object_value function.")
 
         cmdb_object = CMDBObject.objects.create(
             type=cmdb_object_type,
             object_id=model_object.id
         )
 
+        # Check the associated fields to the object
+        object_fields = cmdb_object.fields
+
+        for field in object_fields:
+            if field.model_field:
+                # Create value object for the field where the field is the ServiceNow field
+                # model_field is the field associated the the ServiceNow field
+                self.create_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
+            elif field.model_function:
+                # Pass a function instead when the relationship is not directly 1:1
+                func = getattr(store, field.model_function)
+                self.create_cmdb_object_value(cmdb_object, field, func(model_object))
+            else:
+                raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
+
         cmdb_object.post(self.token.access_token)
         return cmdb_object
 
     @staticmethod
-    def does_cmdb_object_exists(model_object):
+    def does_cmdb_object_exist(model_object):
         """
         Return true or false depending if the model has a cmdb object
 
-        :param model_object:
-        :return:
+        Args:
+            model_object:
+
+        Returns:
+
         """
 
         model = ContentType.objects.get_for_model(model_object)
+
         cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
+
         object_id = model_object.id
 
         cmdb_object_exists = CMDBObject.objects.filter(
@@ -182,8 +250,11 @@ class SNCMDBHandler:
         """
         Usage: whenever a model is updated add this command
 
-        :param model_object:
-        :return:
+        Args:
+            model_object:
+
+        Returns:
+
         """
         model = ContentType.objects.get_for_model(model_object)
         cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
@@ -197,6 +268,20 @@ class SNCMDBHandler:
         except CMDBObject.DoesNotExist:
             raise "You must create a cmdb_object first."
 
-        cmdb_object.put(self, self.token)
+        # Check the associated fields to the object
+        object_fields = cmdb_object.fields
 
-        return True
+        for field in object_fields:
+            if field.model_field:
+                # Create value object for the field where the field is the ServiceNow field
+                # model_field is the field associated the the ServiceNow field
+                self.create_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
+            elif field.model_function:
+                # Pass a function instead when the relationship is not directly 1:1
+                func = getattr(store, field.model_function)
+                self.create_cmdb_object_value(cmdb_object, field, func(model_object))
+            else:
+                raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
+
+        cmdb_object.put(self.token.access_token)
+        return cmdb_object
