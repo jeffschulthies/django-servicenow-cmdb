@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
 from .models import CMDBObjectType, CMDBObject, CMDBObjectValue, ServiceNowToken, CMDBObjectField
-import service_now_cmdb.function_mapping as store
+from . import field_mapping as store
 
 
 class SNCMDBHandler:
