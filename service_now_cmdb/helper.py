@@ -266,7 +266,7 @@ class SNCMDBHandler:
                 object_id=object_id
             )
         except CMDBObject.DoesNotExist:
-            raise "You must create a cmdb_object first."
+            raise ValueError("You must create a cmdb_object first.")
 
         # Check the associated fields to the object
         object_fields = cmdb_object.fields
