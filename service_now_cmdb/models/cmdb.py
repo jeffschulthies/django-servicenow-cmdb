@@ -74,9 +74,10 @@ class CMDBObject(models.Model):
     @property
     def fields(self):
         """
+        Retrieves the fields associated with a CMDBObject
 
         Returns:
-
+            QueryList of CMDBObjectField.
         """
         fields = CMDBObjectField.objects.filter(type=self.type)
         return fields
@@ -84,9 +85,10 @@ class CMDBObject(models.Model):
     @property
     def field_names(self):
         """
+        Retrieves the field names associated with a CMDBObject
 
         Returns:
-
+            List of field names (str)
         """
         field_names = CMDBObjectField.objects.filter(type=self.type).values_list('name', flat=True)
         return field_names
@@ -94,9 +96,10 @@ class CMDBObject(models.Model):
     @property
     def non_empty_field_names(self):
         """
+        Retrieves the field names where the values are not none.
 
         Returns:
-
+            List of field names (str)
         """
         values = CMDBObjectValue.objects.filter(object=self).values_list('field_id')
         field_names = CMDBObjectField.objects.filter(pk__in=values).values_list('name', flat=True)
@@ -105,9 +108,10 @@ class CMDBObject(models.Model):
     @property
     def key_value(self):
         """
+        Retrieves a key a value pair of the fields in the CMDBObject
 
         Returns:
-
+            Dictionary
         """
         values = CMDBObjectValue.objects.filter(object=self).values()
         d = dict()
@@ -119,12 +123,16 @@ class CMDBObject(models.Model):
 
     def post(self, access_token):
         """
+        Post to SN
 
         Args:
-            access_token:
+            access_token: Access token from SN
 
         Returns:
+            bool: True if successful. False otherwise
 
+        Raises:
+            ValueError: When there is an invalid endpoint or lack of model access.
         """
         service_now_headers = {
             'Authorization': 'Bearer {}'.format(access_token),
@@ -154,12 +162,16 @@ class CMDBObject(models.Model):
 
     def put(self, access_token):
         """
+        Put to SN
 
         Args:
-            access_token:
+            access_token: Access token from SN
 
         Returns:
+            bool: True if successful. False otherwise
 
+        Raises:
+            ValueError: When there is an invalid endpoint or lack of model access.
         """
 
         if not self.service_now_id:
@@ -188,13 +200,18 @@ class CMDBObject(models.Model):
 
     def get(self, access_token):
         """
+        Get the object from SN
 
         Args:
-            access_token:
+            access_token: Access token from SN.
 
         Returns:
+            Response text (str).
 
+        Raises:
+            ValueError: When there is an invalid endpoint or lack of model access.
         """
+
         if not self.service_now_id:
             raise ValueError("There is no ServiceNow ID associated with this object. Try creating the object first.")
 
@@ -220,12 +237,16 @@ class CMDBObject(models.Model):
 
     def delete(self, access_token):
         """
+        Delete the object from SN
 
         Args:
-            access_token:
+            access_token: Access token from SN
 
         Returns:
+            bool: True if successful. False otherwise.
 
+        Raises:
+            ValueError: When there is an invalid endpoint or lack of model access.
         """
 
         if not self.service_now_id:
@@ -256,12 +277,13 @@ class CMDBObject(models.Model):
 
     def get_field(self, name):
         """
+        Retrieve CMDBObjectField for the CMDBObject.
 
         Args:
-            name:
+            name: Name of the field
 
         Returns:
-
+            CMDBObjectField
         """
         values = CMDBObjectValue.objects.filter(object=self)
         for i in values:
@@ -271,13 +293,13 @@ class CMDBObject(models.Model):
 
     def set_field(self, name, value):
         """
+        Set the CMDBObjectField for the CMDBObject.
 
         Args:
-            name:
-            value:
-
+            name: Name of the field
+            value: Value that will be set for the Object
         Returns:
-
+            Nothing
         """
         object_value = CMDBObjectValue.objects.create(object=self, field=name, value=value)
         object_value.save()
@@ -299,4 +321,10 @@ class CMDBObjectValue(models.Model):
 
     @property
     def object_field(self):
+        """
+        Retrieve the CMDBObjectField for the CMDBObjectValue.
+
+        Returns:
+            CMDBObjectField
+        """
         return CMDBObjectField.objects.get(id=self.field)

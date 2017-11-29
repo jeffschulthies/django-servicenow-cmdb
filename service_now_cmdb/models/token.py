@@ -12,7 +12,7 @@ from urllib.parse import quote_plus
 
 class ServiceNowToken(models.Model):
     """
-    Stub
+    SN Token for authorization
     """
     user = models.OneToOneField(User)
     created = models.DateTimeField(auto_now_add=True)
@@ -31,9 +31,10 @@ class ServiceNowToken(models.Model):
     @property
     def is_expired(self):
         """
+        This is used to determine if a ServiceNowToken has expired.
 
         Returns:
-
+            bool: True if expired, False otherwise.
         """
         if self.expires == "" or self.expires is None or timezone.now() > self.expires:
             return True
@@ -41,15 +42,14 @@ class ServiceNowToken(models.Model):
 
     def _update_token(self, data):
         """
-        Used by the get new token method
+        Update a SN Token.
 
         Args:
-            data:
+            data: Processed response from the get_new_token() payload.
 
         Returns:
-
+            bool: True if successful
         """
-
         self.scope = data['scope']
         expiration = timezone.now() + timezone.timedelta(seconds=int((data['expires_in'])))
         self.expires = expiration
@@ -60,10 +60,12 @@ class ServiceNowToken(models.Model):
 
     def get_new_token(self):
         """
+        Get a new SN Token.
 
-        Returns: False if the endpoint
+        Returns:
+            bool: True if successful, False otherwise.
+
         Raises ValueError: This can be caused by multiple errors.
-
         """
 
         url = "https://{}.service-now.com/oauth_token.do".format(settings.SERVICE_NOW_DOMAIN)
@@ -94,7 +96,6 @@ class ServiceNowToken(models.Model):
         data = json.loads(r.text)
 
         self._update_token(data)
-        print(self.access_token)
         return True
 
     @staticmethod
@@ -103,11 +104,11 @@ class ServiceNowToken(models.Model):
         Create a token from a json object created from the ServiceNow response.
 
         Args:
-            data:
-            user:
+            data: Data received from a get_new_token payload.
+            user: User that will associated with the token.
 
         Returns:
-
+            ServiceNowToken that was created.
         """
 
         expiration = timezone.now() + (timezone.timedelta(seconds=int(data['expires_in'])))
@@ -131,12 +132,14 @@ class ServiceNowToken(models.Model):
     @staticmethod
     def get_credentials(username, password):
         """
+        Retrieve the SN token for the user.
 
         Args:
-            username:
-            password:
+            username: SN username
+            password: SN Password
 
         Returns:
+            Response loaded into JSON.
 
         """
         url = "https://{}.service-now.com/oauth_token.do".format(settings.SERVICE_NOW_DOMAIN)
