@@ -30,9 +30,14 @@ class ServiceNowToken(models.Model):
 
     @property
     def is_expired(self):
+        """
+
+        Returns:
+
+        """
         if self.expires == "" or self.expires is None or timezone.now() > self.expires:
-            return False
-        return True
+            return True
+        return False
 
     def _update_token(self, data):
         """
@@ -89,6 +94,7 @@ class ServiceNowToken(models.Model):
         data = json.loads(r.text)
 
         self._update_token(data)
+        print(self.access_token)
         return True
 
     @staticmethod
@@ -144,7 +150,7 @@ class ServiceNowToken(models.Model):
             'client_id': '{}'.format(settings.SERVICE_NOW_CLIENT_ID),
             'username': username,
             'password': password
-             }
+         }
 
         payload = urllib.parse.urlencode(data, quote_via=quote_plus)
         payload = payload + "&client_secret={}".format(settings.SERVICE_NOW_CLIENT_SECRET)
@@ -157,7 +163,5 @@ class ServiceNowToken(models.Model):
         try:
             r.raise_for_status()
         except:
-            raise ValueError("Invalid ServiceNow Endpoint. Check SERVICE_NOW_DOMAIN, SERVICE_NOW_CLIENT_ID, "
-                             "or SERVICE_NOW_CLIENT_SECRET in the settings file.")
-
+            raise ValueError("Invalid Credentials.")
         return json.loads(r.text)

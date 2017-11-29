@@ -8,6 +8,9 @@ from . import field_mapping as store
 
 
 class SNCMDBHandler:
+    """
+    SNCMDB Handler. Provides a wrapper to interact with the cmdb models.
+    """
     def __init__(self, user):
         self.user = user
         self.domain = settings.SERVICE_NOW_DOMAIN
@@ -17,40 +20,53 @@ class SNCMDBHandler:
 
     def create_credentials(self, username, password):
         """
-        If the user is not associated with sn credentials.
+        Requests a SN token using the user credentials and stores it in the database.
 
         Args:
-            username:
-            password:
+            username: SN Username. (Depends on your organization)
+            password: SN Password.
 
         Returns:
-
+            bool: True if successful, False otherwise.
         """
+
         data = ServiceNowToken.get_credentials(username, password)
         self.token = ServiceNowToken.create_token(data, self.user)
         return True
 
     def get_credentials(self):
         """
+        Retrieves the SN Token. This function checks if the user has a token in the database.
+        It refreshes the token if it is invalid.
 
         Returns:
-
+            bool: True if successful, False otherwise.
         """
         try:
             self.token = ServiceNowToken.objects.get(user=self.user)
         except ObjectDoesNotExist:
             return False
+
+        if self.token.is_expired:
+            self.token.get_new_token()
         return True
 
     @staticmethod
     def create_cmdb_object_type(model, endpoint):
         """
+        Creates a CMDB Object Type. The type of object you want to model from ServiceNow.
 
         Args:
-            model:
-            endpoint:
+            model: The name of Django model you want to map.
+            endpoint: ServiceNow API Endpoint. This is the table name in the endpoint. https://[instance].service-now.com/api/now/table/[table_name]
 
         Returns:
+            CMDBObjectType that was created.
+
+
+        Example:
+            >>> from test.models import IPAddress
+            >>> cmdb_type = handler.create_cmdb_object_type(IPAddress, "cmdb_ci_ip_network")
 
         """
         model = ContentType.objects.get_for_model(model)
@@ -64,13 +80,18 @@ class SNCMDBHandler:
     @staticmethod
     def update_cmdb_object_type(model, endpoint):
         """
-        Update the model endpoint
+        Update a CMDB Object Type.
 
         Args:
-            model:
-            endpoint:
+            model: The name of Django model you want to map.
+            endpoint: ServiceNow API Endpoint. This is the table name in the endpoint. https://[instance].service-now.com/api/now/table/[table_name]
 
         Returns:
+            CMDBObjectType that was created.
+
+        Example:
+            >>> from test.models import IPAddress
+            >>> cmdb_type = handler.update_cmdb_object_type(IPAddress, "new_cmdb_ci_ip_network")
 
         """
         model = ContentType.objects.get_for_model(model)
@@ -85,15 +106,23 @@ class SNCMDBHandler:
     @staticmethod
     def create_cmdb_object_field(name, cmdb_type, order, model_field="", model_function=""):
         """
+        Creates a CMDB Object Field. This is the field of the SN object you want map to a Django model.
 
         Args:
-            name:
-            cmdb_type:
-            order:
-            model_field:
-            model_function:
+            name (str): The name of the ServiceNow Object field.
+            cmdb_type (CMDBObjectType): The type of ServiceNow object.
+            order (int): This will be used for ordering results in the future. This is currently not implemented.
+            model_field (str): A model can either have a model_field or model_function not both. A model field is used when the Django model and ServiceNow object is a 1:1 mapping. The field refers to the field name of the model in Django models file.
+            model_function (str): The name of the function found in field_mapping.py. A model function is used when we must do some processing before we do the mapping. It passes the entire Django model to the function in field mappings file.
 
         Returns:
+            CMDBObjectField that was created.
+
+        Example
+        -------
+        >>> from testmodels.models import IPAddress
+        >>> cmdb_type = handler.create_cmdb_object_type(IPAddress, "cmdb_ci_ip_network")
+
 
         """
 
@@ -114,17 +143,17 @@ class SNCMDBHandler:
     @staticmethod
     def update_cmdb_object_field(name, cmdb_type, new_name=None, order=None, model_field=None, model_function=None):
         """
+        Updates a CMDB Object Field.
 
         Args:
-            name:
-            cmdb_type:
-            new_name:
-            order:
-            model_field:
-            model_function:
+            name: The name of the ServiceNow Object field.
+            cmdb_type: The type of ServiceNow object.
+            order: This will be used for ordering results in the future. This is currently not implemented.
+            model_field: A model can either have a model_field or model_function not both. A model field is used when the Django model and ServiceNow object is a 1:1 mapping. The field refers to the field name of the model in Django models file.
+            model_function: The name of the function found in field_mapping.py. A model function is used when we must do some processing before we do the mapping. It passes the entire Django model to the function in field mappings file.
 
         Returns:
-
+            CMDBObjectField that was updated.
         """
         cmdb_object_field = CMDBObjectField.objects.get(name=name, type=cmdb_type)
         if new_name:
@@ -171,10 +200,14 @@ class SNCMDBHandler:
         Returns:
 
         """
-        cmdb_object_value = CMDBObjectValue.objects.get(
-            object=cmdb_object,
-            field=cmdb_field
-        )
+        try:
+            cmdb_object_value = CMDBObjectValue.objects.get(
+                object=cmdb_object,
+                field=cmdb_field
+            )
+        except CMDBObjectValue.MultipleObjectsReturned:
+            # TODO: Replace with a log
+            print("Fatal error")
 
         cmdb_object_value.value = value
         cmdb_object_value.save()
@@ -212,11 +245,16 @@ class SNCMDBHandler:
             elif field.model_function:
                 # Pass a function instead when the relationship is not directly 1:1
                 func = getattr(store, field.model_function)
-                self.create_cmdb_object_value(cmdb_object, field, func(model_object))
+                if func is not None:
+                    self.create_cmdb_object_value(cmdb_object, field, func(model_object))
+                else:
+                    # Log This
+                    print("Model function field is incorrect")
             else:
                 raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
-
-        cmdb_object.post(self.token.access_token)
+        if not cmdb_object.post(self.token.access_token):
+            # Log This
+            raise ValueError("Something happened with the model")
         return cmdb_object
 
     @staticmethod
@@ -275,13 +313,84 @@ class SNCMDBHandler:
             if field.model_field:
                 # Create value object for the field where the field is the ServiceNow field
                 # model_field is the field associated the the ServiceNow field
-                self.create_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
+                self.update_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
             elif field.model_function:
                 # Pass a function instead when the relationship is not directly 1:1
                 func = getattr(store, field.model_function)
-                self.create_cmdb_object_value(cmdb_object, field, func(model_object))
+                if func is not None:
+                    self.update_cmdb_object_value(cmdb_object, field, func(model_object))
+                else:
+                    # Change to console log
+                    print("Model Function is incorrect")
             else:
                 raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
 
         cmdb_object.put(self.token.access_token)
         return cmdb_object
+
+
+    def delete_cmdb_object(self, model_object):
+        """
+        Usage: whenever a model is updated add this command
+
+        Args:
+            model_object:
+
+        Returns:
+
+        """
+        model = ContentType.objects.get_for_model(model_object)
+        cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
+        object_id = model_object.id
+
+        try:
+            cmdb_object = CMDBObject.objects.get(
+                type=cmdb_object_type,
+                object_id=object_id
+            )
+        except CMDBObject.DoesNotExist:
+            raise ValueError("You must create a cmdb_object first.")
+
+        # Check the associated fields to the object
+        object_fields = cmdb_object.fields
+
+        for field in object_fields:
+            if field.model_field:
+                # Create value object for the field where the field is the ServiceNow field
+                # model_field is the field associated the the ServiceNow field
+                self.update_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
+            elif field.model_function:
+                # Pass a function instead when the relationship is not directly 1:1
+                func = getattr(store, field.model_function)
+                if func is not None:
+                    self.update_cmdb_object_value(cmdb_object, field, func(model_object))
+                else:
+                    # Change to console log
+                    print("Model Function is incorrect")
+            else:
+                raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
+
+        cmdb_object.put(self.token.access_token)
+        return cmdb_object
+
+    @staticmethod
+    def is_cmdb_type_mapped(model_object):
+        """
+        Return true or false depending if the model has a cmdb object
+
+        Args:
+            model_object:
+
+        Returns:
+
+        """
+
+        model = ContentType.objects.get_for_model(model_object)
+
+        cmdb_object_type_exists = CMDBObjectType.objects.filter(
+            content_type=model.id,
+        ).exists()
+
+        if cmdb_object_type_exists:
+            return True
+        return False

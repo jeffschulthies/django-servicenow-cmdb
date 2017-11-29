@@ -1,50 +1,382 @@
-from service_now_cmdb.models.cmdb import CMDBObjectType, CMDBObjectField, CMDBObject, CMDBObjectValue
-from service_now_cmdb.tests.models.base_model_test import BaseModelTest
-from service_now_cmdb.tests.models.factories import CMDBCompleteType
+from django.contrib.contenttypes.models import ContentType
+
+from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+
+from .models import CMDBObjectType, CMDBObject, CMDBObjectValue, ServiceNowToken, CMDBObjectField
+from . import field_mapping as store
 
 
-class TestCMDBObject(BaseModelTest):
-    def setUp(self):
-        self.cmdb_type = CMDBCompleteType()
-        self.cmdb_object_field = CMDBObjectField.objects.get(type=self.cmdb_type)
-        self.cmdb_object = CMDBObject.objects.get(type=self.cmdb_type)
-        self.cmdb_value = CMDBObjectValue.objects.get(field=self.cmdb_object_field,
-                                                      object=self.cmdb_object)
+class SNCMDBHandler:
+    """A ServiceNowCMDB handler.
+    Provides a wrapper to interact with the cmdb models.
+    Basic Usage::
+      >>> import requests
+      >>> s = requests.Session()
+      >>> s.get('http://httpbin.org/get')
+      <Response [200]>
+    Or as a context manager::
+      >>> with requests.Session() as s:
+      >>>     s.get('http://httpbin.org/get')
+      <Response [200]>
+    """
 
-    def tearDown(self):
-        CMDBObjectType.objects.all().delete()
-        CMDBObjectField.objects.all().delete()
-        CMDBObject.objects.all().delete()
-        CMDBObjectValue.objects.all().delete()
+    def __init__(self, user):
+        self.user = user
+        self.domain = settings.SERVICE_NOW_DOMAIN
+        self.client_id = settings.SERVICE_NOW_CLIENT_ID
+        self.client_secret = settings.SERVICE_NOW_CLIENT_SECRET
+        self.token = None
 
-    def test_field_names(self):
-        # TODO: Test ordering and test multiple fields
-        self.assertEqual(self.cmdb_object.fields.first(), "subnet")
+    def create_credentials(self, username, password):
+        """
+        If the user is not associated with sn credentials.
 
-    def test_key_value(self):
-        expected_dict = dict()
-        expected_dict['subnet'] = '55.55.55.122'
+        Args:
+            username:
+            password:
 
-        self.assertEqual(self.cmdb_object.key_value, expected_dict)
+        Returns:
 
-    def test_object_post(self):
-        pass
+        """
+        data = ServiceNowToken.get_credentials(username, password)
+        self.token = ServiceNowToken.create_token(data, self.user)
+        return True
 
-    def test_object_put(self):
-        pass
+    def get_credentials(self):
+        """
 
-    def test_object_get(self):
-        pass
+        Returns:
 
-    def test_object_get_field(self):
-        pass
+        """
+        try:
+            self.token = ServiceNowToken.objects.get(user=self.user)
+        except ObjectDoesNotExist:
+            return False
 
-    def test_object_set_field(self):
-        pass
+        if self.token.is_expired:
+            self.token.get_new_token()
+        return True
 
-    def test_object_value_object_field(self):
-        pass
+    @staticmethod
+    def create_cmdb_object_type(model, endpoint):
+        """
 
-    def test_object_relation(self):
-        pass
+        Args:
+            model:
+            endpoint:
 
+        Returns:
+
+        """
+        model = ContentType.objects.get_for_model(model)
+        cmdb_object_type = CMDBObjectType.objects.create(
+            name=model.name,
+            endpoint=endpoint,
+            content_type=model
+        )
+        return cmdb_object_type
+
+    @staticmethod
+    def update_cmdb_object_type(model, endpoint):
+        """
+        Update the model endpoint
+
+        Args:
+            model:
+            endpoint:
+
+        Returns:
+
+        """
+        model = ContentType.objects.get_for_model(model)
+        cmdb_object_type = CMDBObjectType.objects.get(
+            name=model.name,
+            content_type=model
+        )
+        cmdb_object_type.endpoint = endpoint
+        cmdb_object_type.save()
+        return cmdb_object_type
+
+    @staticmethod
+    def create_cmdb_object_field(name, cmdb_type, order, model_field="", model_function=""):
+        """
+
+        Args:
+            name:
+            cmdb_type:
+            order:
+            model_field:
+            model_function:
+
+        Returns:
+
+        """
+
+        if model_field and model_function:
+            raise ValueError("model_field and model_function are both defined. You may only set one of them.")
+        if not model_field and not model_function:
+            raise ValueError("Neither model_field nor model_function are defined. You may must set one of them.")
+
+        cmdb_object_field = CMDBObjectField.objects.create(
+            name=name,
+            type=cmdb_type,
+            model_field=model_field,
+            model_function=model_function,
+            order=order
+        )
+        return cmdb_object_field
+
+    @staticmethod
+    def update_cmdb_object_field(name, cmdb_type, new_name=None, order=None, model_field=None, model_function=None):
+        """
+
+        Args:
+            name:
+            cmdb_type:
+            new_name:
+            order:
+            model_field:
+            model_function:
+
+        Returns:
+
+        """
+        cmdb_object_field = CMDBObjectField.objects.get(name=name, type=cmdb_type)
+        if new_name:
+            cmdb_object_field.name = new_name
+        if order:
+            cmdb_object_field.order = order
+        if model_field:
+            cmdb_object_field.model_field = model_field
+        if model_function:
+            cmdb_object_field.model_function = model_function
+
+        cmdb_object_field.save()
+
+        return cmdb_object_field
+
+    @staticmethod
+    def create_cmdb_object_value(cmdb_object, cmdb_field, value):
+        """
+
+        Args:
+            cmdb_object:
+            cmdb_field:
+            value:
+
+        Returns:
+
+        """
+        cmdb_object_value = CMDBObjectValue.objects.create(
+            object=cmdb_object,
+            field=cmdb_field,
+            value=value
+        )
+        return cmdb_object_value
+
+    @staticmethod
+    def update_cmdb_object_value(cmdb_object, cmdb_field, value):
+        """
+
+        Args:
+            cmdb_object:
+            cmdb_field:
+            value:
+
+        Returns:
+
+        """
+        try:
+            cmdb_object_value = CMDBObjectValue.objects.get(
+                object=cmdb_object,
+                field=cmdb_field
+            )
+        except CMDBObjectValue.MultipleObjectsReturned:
+            # TODO: Replace with a log
+            print("Fatal error")
+
+        cmdb_object_value.value = value
+        cmdb_object_value.save()
+        return cmdb_object_value
+
+    def create_cmdb_object(self, model_object):
+        """
+
+        Args:
+            model_object:
+
+        Returns:
+
+        """
+
+        model = ContentType.objects.get_for_model(model_object)
+        cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
+
+        if self.does_cmdb_object_exist(model_object):
+            raise ValueError("This object already has a model. Try using the update_cmdb_object_value function.")
+
+        cmdb_object = CMDBObject.objects.create(
+            type=cmdb_object_type,
+            object_id=model_object.id
+        )
+
+        # Check the associated fields to the object
+        object_fields = cmdb_object.fields
+
+        for field in object_fields:
+            if field.model_field:
+                # Create value object for the field where the field is the ServiceNow field
+                # model_field is the field associated the the ServiceNow field
+                self.create_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
+            elif field.model_function:
+                # Pass a function instead when the relationship is not directly 1:1
+                func = getattr(store, field.model_function)
+                if func is not None:
+                    self.create_cmdb_object_value(cmdb_object, field, func(model_object))
+                else:
+                    # Log This
+                    print("Model function field is incorrect")
+            else:
+                raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
+        if not cmdb_object.post(self.token.access_token):
+            # Log This
+            raise ValueError("Something happened with the model")
+        return cmdb_object
+
+    @staticmethod
+    def does_cmdb_object_exist(model_object):
+        """
+        Return true or false depending if the model has a cmdb object
+
+        Args:
+            model_object:
+
+        Returns:
+
+        """
+
+        model = ContentType.objects.get_for_model(model_object)
+
+        cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
+
+        object_id = model_object.id
+
+        cmdb_object_exists = CMDBObject.objects.filter(
+            type=cmdb_object_type,
+            object_id=object_id
+        ).exists()
+
+        if cmdb_object_exists:
+            return True
+        return False
+
+    def update_cmdb_object(self, model_object):
+        """
+        Usage: whenever a model is updated add this command
+
+        Args:
+            model_object:
+
+        Returns:
+
+        """
+        model = ContentType.objects.get_for_model(model_object)
+        cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
+        object_id = model_object.id
+
+        try:
+            cmdb_object = CMDBObject.objects.get(
+                type=cmdb_object_type,
+                object_id=object_id
+            )
+        except CMDBObject.DoesNotExist:
+            raise ValueError("You must create a cmdb_object first.")
+
+        # Check the associated fields to the object
+        object_fields = cmdb_object.fields
+
+        for field in object_fields:
+            if field.model_field:
+                # Create value object for the field where the field is the ServiceNow field
+                # model_field is the field associated the the ServiceNow field
+                self.update_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
+            elif field.model_function:
+                # Pass a function instead when the relationship is not directly 1:1
+                func = getattr(store, field.model_function)
+                if func is not None:
+                    self.update_cmdb_object_value(cmdb_object, field, func(model_object))
+                else:
+                    # Change to console log
+                    print("Model Function is incorrect")
+            else:
+                raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
+
+        cmdb_object.put(self.token.access_token)
+        return cmdb_object
+
+    def delete_cmdb_object(self, model_object):
+        """
+        Usage: whenever a model is deleted
+
+        Args:
+            model_object:
+
+        Returns:
+
+        """
+        model = ContentType.objects.get_for_model(model_object)
+        cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
+        object_id = model_object.id
+
+        try:
+            cmdb_object = CMDBObject.objects.get(
+                type=cmdb_object_type,
+                object_id=object_id
+            )
+        except CMDBObject.DoesNotExist:
+            raise ValueError("You must create a cmdb_object first.")
+
+        # Check the associated fields to the object
+        object_fields = cmdb_object.fields
+
+        for field in object_fields:
+            if field.model_field:
+                # Create value object for the field where the field is the ServiceNow field
+                # model_field is the field associated the the ServiceNow field
+                self.update_cmdb_object_value(cmdb_object, field, getattr(model_object, field.model_field))
+            elif field.model_function:
+                # Pass a function instead when the relationship is not directly 1:1
+                func = getattr(store, field.model_function)
+                if func is not None:
+                    self.update_cmdb_object_value(cmdb_object, field, func(model_object))
+                else:
+                    # Change to console log
+                    print("Model Function is incorrect")
+            else:
+                raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
+
+        cmdb_object.delete(self.token.access_token)
+        return cmdb_object
+
+    @staticmethod
+    def is_cmdb_type_mapped(model_object):
+        """
+        Return true or false depending if the model has a cmdb object
+
+        Args:
+            model_object:
+
+        Returns:
+
+        """
+
+        model = ContentType.objects.get_for_model(model_object)
+
+        cmdb_object_type_exists = CMDBObjectType.objects.filter(
+            content_type=model.id,
+        ).exists()
+
+        if cmdb_object_type_exists:
+            return True
+        return False

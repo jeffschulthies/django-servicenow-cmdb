@@ -13,7 +13,7 @@ class CMDBObjectTypeAdmin(admin.ModelAdmin):
 @admin.register(CMDBObjectField)
 class CMDBObjectFieldAdmin(admin.ModelAdmin):
     form = CMDBObjectFieldForm
-    list_display = ['name', 'type', 'order']
+    list_display = ['name', 'model_field', 'model_function', 'type', 'order']
 
 
 @admin.register(CMDBObject)
