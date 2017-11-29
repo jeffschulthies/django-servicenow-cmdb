@@ -92,7 +92,6 @@ class SNCMDBHandler:
         Example:
             >>> from test.models import IPAddress
             >>> cmdb_type = handler.update_cmdb_object_type(IPAddress, "new_cmdb_ci_ip_network")
-
         """
         model = ContentType.objects.get_for_model(model)
         cmdb_object_type = CMDBObjectType.objects.get(
@@ -120,10 +119,8 @@ class SNCMDBHandler:
 
         Example
         -------
-        >>> from testmodels.models import IPAddress
+        >>> from test.models import IPAddress
         >>> cmdb_type = handler.create_cmdb_object_type(IPAddress, "cmdb_ci_ip_network")
-
-
         """
 
         if model_field and model_function:
@@ -172,13 +169,15 @@ class SNCMDBHandler:
     @staticmethod
     def create_cmdb_object_value(cmdb_object, cmdb_field, value):
         """
+        Create a value for the object. The fields are only tracked if defined in CMDBObjectField.
 
         Args:
-            cmdb_object:
-            cmdb_field:
-            value:
+            cmdb_object (CMDBObject): The object that is being tracked
+            cmdb_field (CMDBObjectField) : The field that is being tracked
+            value (str): The value that will be associated with these two fields.
 
         Returns:
+            CMDBObjectValue that was created.
 
         """
         cmdb_object_value = CMDBObjectValue.objects.create(
@@ -191,13 +190,15 @@ class SNCMDBHandler:
     @staticmethod
     def update_cmdb_object_value(cmdb_object, cmdb_field, value):
         """
+        Update a value for the object. The fields are only tracked if defined in CMDBObjectField.
 
         Args:
-            cmdb_object:
-            cmdb_field:
-            value:
+            cmdb_object (CMDBObject): The object that is being tracked
+            cmdb_field (CMDBObjectField) : The field that is being tracked
+            value (str): The value that will be associated with these two fields.
 
         Returns:
+            CMDBObjectValue that was updated.
 
         """
         try:
@@ -215,12 +216,23 @@ class SNCMDBHandler:
 
     def create_cmdb_object(self, model_object):
         """
+        Create a CMDBObject. These objects are created to allow us to track which objects are in SN.
 
         Args:
-            model_object:
+            model_object: Any Django object.
 
         Returns:
+            CMDBObject that was created.
 
+        Raises:
+              ValueError: When there is an issue with the models
+              AttributeError: Occurs when a field does not contain a mapping field or function.
+
+        Example:
+            >>> from test.models import IPAddress
+            >>> cmdb_type = handler.create_cmdb_object_type(IPAddress, "cmdb_ci_ip_network")
+            >>> ip_to_insert = IPAddress.objects.create()
+            >>> create_cmdb_object(ip_to_insert)
         """
 
         model = ContentType.objects.get_for_model(model_object)
@@ -260,15 +272,20 @@ class SNCMDBHandler:
     @staticmethod
     def does_cmdb_object_exist(model_object):
         """
-        Return true or false depending if the model has a cmdb object
+        This is used to determine if a CMDBObject exists for a model object.
 
         Args:
-            model_object:
+            model_object: Any Django object.
 
         Returns:
+            bool: True if successful, False otherwise.
 
+        Example:
+            >>> from test.models import IPAddress
+            >>> cmdb_type = handler.create_cmdb_object_type(IPAddress, "cmdb_ci_ip_network")
+            >>> ip_to_insert = IPAddress.objects.create()
+            >>> does_cmdb_object_exist(ip_to_insert)
         """
-
         model = ContentType.objects.get_for_model(model_object)
 
         cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
@@ -286,13 +303,17 @@ class SNCMDBHandler:
 
     def update_cmdb_object(self, model_object):
         """
-        Usage: whenever a model is updated add this command
+        Update a CMDBObject. This will update the object with current values of the Django model object.
 
         Args:
-            model_object:
+            model_object: Any Django object.
+
+        Raises:
+              ValueError: When the CMDBObject for the model_object does not exist.
+              AttributeError: Occurs when a field does not contain a mapping field or function.
 
         Returns:
-
+            CMDBObject that was created.
         """
         model = ContentType.objects.get_for_model(model_object)
         cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
@@ -328,16 +349,18 @@ class SNCMDBHandler:
         cmdb_object.put(self.token.access_token)
         return cmdb_object
 
-
     def delete_cmdb_object(self, model_object):
         """
-        Usage: whenever a model is updated add this command
+        Delete a CMDBObject. This will delete the mapping between the model object and the SN object. You will need to
+        recreate another SN object if the mapping is deleted.
 
         Args:
-            model_object:
+            model_object: Any Django object.
 
         Returns:
+            CMDBObject that was deleted.
 
+        Note: This implementation retires the SN Object because of SN permission restrictions. To modify this update the delete method of the cmdb object.
         """
         model = ContentType.objects.get_for_model(model_object)
         cmdb_object_type = CMDBObjectType.objects.get(content_type=model.id)
@@ -370,19 +393,19 @@ class SNCMDBHandler:
             else:
                 raise AttributeError("The field {} does not a contain a model_field or model function".format(field))
 
-        cmdb_object.put(self.token.access_token)
+        cmdb_object.delete(self.token.access_token)
         return cmdb_object
 
     @staticmethod
     def is_cmdb_type_mapped(model_object):
         """
-        Return true or false depending if the model has a cmdb object
+        Determines if a mapping exists for a CMDBObjectType and a model object.
 
         Args:
-            model_object:
+            model_object: Any Django object.
 
         Returns:
-
+            bool: True if it exists, False otherwise.
         """
 
         model = ContentType.objects.get_for_model(model_object)
